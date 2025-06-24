@@ -224,8 +224,8 @@ class WeatherCommand extends Command
                     return json_encode(GetWeatherAction::handle($latitude, $longitude));
                 }),
             Tool::as('get_coordinates')
-                ->for('Get current weather conditions')
-                ->withStringParameter('place', 'The city to get weather for')
+                ->for('Get current coordinates for a given place')
+                ->withStringParameter('place', 'The place to get coordinates for')
                 ->using(function (string $place): string {
                     $coordinates = GetCoordinatesAction::handle($place);
 
