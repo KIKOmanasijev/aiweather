@@ -45,3 +45,4 @@ and a model picker would be handy to switch between LLM providers or/and models.
 2. I tend to use DTOs and VOs in my apps. Therefore, I loved using the built-in VOs from Prism, such as: AssistantMessage, UserMessage, ToolCall and etc. 
 3. I never use native functions to iterate or/and manipulate Iterable types. I ALWAYS use Laravel's collections. 
 4. I use views to store large strings (especially if I have dynamic parts in it, such as {{name}} and etc).
+5. You will probably notice me using the query() method (I always start with `Model::query()`) to start chaining up the Eloquent methods. I do this because of the better IDE autocomplete. 
