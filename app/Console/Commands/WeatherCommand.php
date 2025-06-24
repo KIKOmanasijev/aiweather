@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Prism\Prism\Enums\Provider;
 use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
+use Prism\Prism\ValueObjects\Messages\SystemMessage;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
 
 class WeatherCommand extends Command
@@ -31,6 +32,8 @@ class WeatherCommand extends Command
 
 	private Collection $messages;
 
+	private string $model = 'claude-3-5-sonnet-20241022';
+
 	/**
      * Execute the console command.
      */
@@ -51,7 +54,7 @@ class WeatherCommand extends Command
 	        );
 
             $response = Prism::text()
-                ->using(Provider::Anthropic, 'claude-3-5-sonnet-20241022')
+                ->using(Provider::Anthropic, $this->model)
                 ->withMessages($this->messages->all())
                 ->asText();
 
@@ -100,7 +103,11 @@ class WeatherCommand extends Command
 
 		$this->messages = collect();
 
-		$this->messages->push(new UserMessage($systemMessageInstruction));
+		$this->messages->push(
+			str($this->model)->contains('claude') ?
+				new UserMessage($systemMessageInstruction) :
+				new SystemMessage($systemMessageInstruction)
+		);
 
 		$this->messages = $this->messages->concat(Message::query()->latest()->get()->map(function ($message) {
 			return match ($message->type) {
