@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Message extends Model
 {
-	protected $guarded = [];
+    protected $guarded = [];
 
-	public function user(): BelongsTo {
-		return $this->belongsTo(User::class);
-	}
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }
