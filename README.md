@@ -1,61 +1,47 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+## Introduction
+A basic console app that lets users get weather information.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## How it works
+The app is pretty simple, it has Users, and those users can have many Messages. 
+When ever you run the app, you need to provide a valid email (from an account that already exists), 
+and you have 3 attempts to do this.
 
-## About Laravel
+Currently, there is no functionality to create accounts, so use the one created with the seeder.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Each chat message is saved in the database, and the chat can be restored every time 
+you get back to the app.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## How to set up the app
+1. Clone this repo
+2. Install composer dependencies
+3. Run the migrations with `php artisan migrate`
+4. Run the seeder to create a fake account `php artisan db:seed`
+5. Set up the `ANTHROPIC_API_KEY` env key.
+6. Run the command with `php artisan app:weather-command`
+7. Use the email address from the created fake account (test@example.com)
+8. Start asking questions about the weather :)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-## Learning Laravel
+## What did I NOT implement (yet)
+- *Caching the coordinates for the cities.* (This is an easy step, but for the sake of simplicity and to save time, I skipped it)
+- *Model picker* (A proper Laravel model picker, that will allow the user to pick the LLM model could be handy. To save time, I decided to not implement this feature. Laravel Prompts could be used to create fancy select elements)
+- *Track tokens used*
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## What the next dev should build next
+- I would say the things I mentioned above. Caching the response for the cities could improve the response times, 
+and a model picker would be handy to switch between LLM providers or/and models.
+- An option to let users choose a date for which they want to get the weather data for. This implementation only allows users to fetch current weather data.
+- Getting the forecast for the next X days could be also handy. Users with such data could ask questions from the type "When would be the best day in the next X days to get out on a long run?"
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Where they should extend the code
+- initTools() - to define extra tools
+- custom Action classes - to implement the logic
+- adding an extra method to trigger a "select" dropdown using Laravel prompts to select a model/LLM provider.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Any design decisions or caveats
+1. I love using the Action pattern, therefore whenever I build web apps, I tend always have really slim controller methods, with:
+    1. CustomRequest class to handle the validation
+    2. Single Action class that contains the business logic. 
+2. I tend to use DTOs and VOs in my apps. Therefore, I loved using the built-in VOs from Prism, such as: AssistantMessage, UserMessage, ToolCall and etc. 
+3. I never use native functions to iterate or/and manipulate Iterable types. I ALWAYS use Laravel's collections. 
+4. I use views to store large strings (especially if I have dynamic parts in it, such as {{name}} and etc).
