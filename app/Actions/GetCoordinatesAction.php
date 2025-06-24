@@ -22,10 +22,14 @@ class GetCoordinatesAction
                     'longitude' => $response->json('results.0.longitude'),
                 ];
             }
-        } catch (\Exception) {
-            return [];
+        } catch (\Exception $e) {
+            return [
+                'error' => 'Failed to fetch coordinates data: '.$e->getMessage(),
+            ];
         }
 
-        return [];
+        return [
+            'error' => 'Failed to fetch coordinates data.'
+        ];
     }
 }
