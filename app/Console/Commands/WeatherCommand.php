@@ -99,7 +99,13 @@ class WeatherCommand extends Command
         $this->user->messages()->create([
             'content' => $response->text,
             'type' => 'assistant',
-            'tool_calls' => $response->toolCalls,
+            'tool_calls' => collect($response->toolCalls)->map(function (ToolCall $toolCall) {
+                return [
+                    'id' => $toolCall->id,
+                    'name' => $toolCall->name,
+                    'arguments' => $toolCall->arguments(),
+                ];
+            }),
         ]);
 
         $this->messages->push(
