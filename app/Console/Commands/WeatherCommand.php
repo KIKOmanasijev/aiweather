@@ -13,7 +13,10 @@ use Prism\Prism\Facades\Tool;
 use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 use Prism\Prism\ValueObjects\Messages\SystemMessage;
+use Prism\Prism\ValueObjects\Messages\ToolResultMessage;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
+use Prism\Prism\ValueObjects\ToolCall;
+use Prism\Prism\ValueObjects\ToolResult;
 
 class WeatherCommand extends Command
 {
@@ -36,11 +39,9 @@ class WeatherCommand extends Command
     private Collection $messages;
 
     private string $model = 'claude-3-5-sonnet-20241022';
-	private array $tools = [];
 
-	/**
-     * Execute the console command.
-     */
+    private array $tools = [];
+
     public function handle()
     {
         $this->initUser();
@@ -49,32 +50,86 @@ class WeatherCommand extends Command
 
         $question = $this->ask('You are using the Weather CLI app, what can I do for you?');
 
-        while ($question != 'exit') {
+        while ($question !== 'exit') {
+            $this->handleChat($question);
+
+            $question = $this->ask('What else would you ask me?');
+        }
+    }
+
+    private function handleChat(string $question, string $type = 'user'): void
+    {
+        $this->user->messages()->create([
+            'content' => $question,
+            'type' => $type,
+        ]);
+        $this->messages->push(
+            new UserMessage($question)
+        );
+
+        $response = Prism::text()
+            ->using(Provider::Anthropic, $this->model)
+            ->withMessages($this->messages->all())
+            ->withTools($this->tools)
+            ->asText();
+
+        // this measn no toolCalls are triggered
+        if (empty($response->toolCalls)) {
             $this->user->messages()->create([
-                'content' => $question,
-                'type' => 'user',
-            ]);
-            $this->messages->push(
-                new UserMessage($question)
-            );
-
-            $response = Prism::text()
-                ->using(Provider::Anthropic, $this->model)
-                ->withMessages($this->messages->all())
-	            ->withTools($this->tools)
-                ->asText();
-
-            $this->info($response->text);
-
-            $this->user->messages()->create([
-                'content' => $question,
+                'content' => $response->text,
                 'type' => 'assistant',
             ]);
+
             $this->messages->push(
-                new AssistantMessage($question)
+                new AssistantMessage($response->text)
             );
 
-            $question = $this->ask('What else do you want to ask me?');
+            $this->info('Assistant: '.$response->text);
+
+        } else {
+            // handles toolCalls recursively until they resolve their dependencies
+            // ex: user wants to get weather for "London", but this tool needs to resolve London's coordinates
+            // using the 'get_coordinates' tool.
+            $this->handleToolCalls($response);
+        }
+    }
+
+    private function handleToolCalls($response): void
+    {
+        $this->user->messages()->create([
+            'content' => $response->text,
+            'type' => 'assistant',
+            'tool_calls' => $response->toolCalls,
+        ]);
+
+        $this->messages->push(
+            new AssistantMessage($response->text, $response->toolCalls)
+        );
+
+        collect($response->toolResults)->each(function (ToolResult $toolResult) {
+            $this->user->messages()->create([
+                'content' => json_encode([
+                    'toolCallId' => $toolResult->toolCallId,
+                    'toolName' => $toolResult->toolName,
+                    'args' => $toolResult->args,
+                    'result' => $toolResult->result,
+                ]),
+                'type' => 'tool',
+            ]);
+        });
+
+        $this->messages->push(new ToolResultMessage($response->toolResults));
+
+        $response = Prism::text()
+            ->using(Provider::Anthropic, $this->model)
+            ->withMessages($this->messages->all())
+            ->withTools($this->tools)
+            ->asText();
+
+        $this->info('Assistant: '.$response->text);
+
+        if (! empty($response->toolCalls)) {
+            $this->handleToolCalls($response);
         }
     }
 
@@ -116,13 +171,34 @@ class WeatherCommand extends Command
                 new SystemMessage($systemMessageInstruction)
         );
 
-        $this->messages = $this->messages->concat(Message::query()->latest()->get()->map(function ($message) {
-            return match ($message->type) {
-                'user' => new UserMessage($message->content),
-                'assistant' => new AssistantMessage($message->content),
-                default => new UserMessage($message->content),
-            };
-        }));
+	    $this->messages = $this->messages->concat(Message::query()->latest()->get()->map(function ($message) {
+		    return match ($message->type) {
+			    'user' => new UserMessage($message->content),
+			    'assistant' => new AssistantMessage(
+				    $message->content,
+				    collect(json_decode($message->tool_calls, true))->map(function ($toolCall) {
+					    return new ToolCall(
+						    id: $toolCall['id'],
+						    name: $toolCall['name'],
+						    arguments: $toolCall['arguments'],
+					    );
+				    })->all()
+			    ),
+			    'tool' => (function() use ($message){
+				    $data = json_decode($message->content, true);
+
+				    return new ToolResultMessage([
+					    new ToolResult(
+						    toolCallId: $data['toolCallId'],
+						    toolName: $data['toolName'],
+						    args: $data['args'],
+						    result: $data['result'],
+					    )
+				    ]);
+			    })(),
+			    default => new UserMessage($message->content),
+		    };
+	    }));
     }
 
     private function initTools()
@@ -139,23 +215,19 @@ class WeatherCommand extends Command
                     'The longitude of the place we are querying weather data.'
                 )
                 ->using(function (string $latitude, string $longitude): string {
-	                $this->info("Getting temp for lat: $latitude and long: $longitude");
-
-                    return json_encode([
-						'temperature' => '36.5',
-	                    'unit' => 'Celsius'
-					]);
+                    return json_encode(GetWeatherAction::handle($latitude, $longitude));
                 }),
             Tool::as('get_coordinates')
                 ->for('Get current weather conditions')
                 ->withStringParameter('place', 'The city to get weather for')
                 ->using(function (string $place): string {
-					$this->info("Getting coordinates for $place");
+                    $coordinates = GetCoordinatesAction::handle($place);
 
-                    return json_encode([
-						'latitude' => '50.00',
-	                    'longitude' => '15.00',
-                    ]);
+                    $this->info(
+                        sprintf('The latitude and longitude for %s are: %s and %s respectively.', $place, $coordinates['latitude'], $coordinates['longitude'])
+                    );
+
+                    return json_encode($coordinates);
                 }),
         ];
     }
